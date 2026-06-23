@@ -2,6 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import { printHook } from '../utils/logger.js';
+import { parse } from '@babel/parser';
+import traverseModule from '@babel/traverse';
+
+const traverse = traverseModule.default || traverseModule;
 
 function walkDir(dir, callback) {
   if (!fs.existsSync(dir)) return;
@@ -14,7 +18,7 @@ function walkDir(dir, callback) {
 }
 
 export default function fixClient() {
-  console.log(chalk.blue("🔧 Escaneando componentes para inyectar 'use client'..."));
+  console.log(chalk.blue("🔧 Escaneando componentes para inyectar 'use client' (Análisis AST)..."));
 
   let fixedCount = 0;
   const srcDir = path.join(process.cwd(), 'src');
@@ -25,21 +29,61 @@ export default function fixClient() {
   }
 
   walkDir(srcDir, filePath => {
-    if (filePath.endsWith('.tsx') || filePath.endsWith('.ts')) {
+    if (filePath.endsWith('.tsx') || filePath.endsWith('.ts') || filePath.endsWith('.jsx') || filePath.endsWith('.js')) {
       let content = fs.readFileSync(filePath, 'utf8');
       
-      const usesHooks = /use(State|Effect|Ref|Memo|Callback|Context|Reducer|LayoutEffect)/.test(content);
-      const usesFramer = /framer-motion/.test(content);
-      
-      if (usesHooks || usesFramer) {
-        if (!content.includes('"use client"') && !content.includes("'use client'")) {
-          // Extraer comentarios del inicio si los hay para poner use client debajo (opcional)
-          // Pero lo más seguro es ponerlo justo al principio de todo
-          const newContent = `"use client";\n\n${content}`;
-          fs.writeFileSync(filePath, newContent, 'utf8');
-          console.log(chalk.gray(`✅ 'use client' inyectado en ${path.relative(process.cwd(), filePath)}`));
-          fixedCount++;
+      let ast;
+      try {
+        ast = parse(content, {
+          sourceType: 'module',
+          plugins: ['jsx', 'typescript']
+        });
+      } catch (e) {
+        return;
+      }
+
+      let hasUseClient = false;
+      let needsUseClient = false;
+      let firstStatementLine = 1;
+
+      if (ast.program.directives) {
+        for (const dir of ast.program.directives) {
+          if (dir.value.value === 'use client') {
+            hasUseClient = true;
+          }
         }
+      }
+
+      if (hasUseClient) return;
+
+      if (ast.program.body.length > 0) {
+        firstStatementLine = ast.program.body[0].loc.start.line;
+      }
+
+      traverse(ast, {
+        ImportDeclaration(path) {
+          if (path.node.source.value === 'framer-motion') {
+            needsUseClient = true;
+          }
+        },
+        CallExpression(path) {
+          if (path.node.callee.type === 'Identifier') {
+            const name = path.node.callee.name;
+            if (/^use[A-Z]/.test(name)) {
+              needsUseClient = true;
+            }
+          }
+        }
+      });
+
+      if (needsUseClient) {
+        const lines = content.split('\n');
+        // Insert before the first statement, preserving comments at the top
+        lines.splice(firstStatementLine - 1, 0, '"use client";\n');
+        const newContent = lines.join('\n');
+        fs.writeFileSync(filePath, newContent, 'utf8');
+        console.log(chalk.gray(`✅ 'use client' inyectado de forma segura en ${path.relative(process.cwd(), filePath)}`));
+        fixedCount++;
       }
     }
   });
@@ -47,7 +91,7 @@ export default function fixClient() {
   if (fixedCount === 0) {
     console.log(chalk.green("✨ Todos tus componentes dinámicos ya tienen 'use client'."));
   } else {
-    console.log(chalk.green(`\n🎉 Fix completado. Se añadieron directivas en ${fixedCount} archivos.`));
+    console.log(chalk.green(`\n🎉 Fix completado (AST). Se añadieron directivas en ${fixedCount} archivos.`));
     printHook(fixedCount * 50);
   }
 }

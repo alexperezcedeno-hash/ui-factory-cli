@@ -2,6 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import { printHook } from '../utils/logger.js';
+import { parse } from '@babel/parser';
+import traverseModule from '@babel/traverse';
+
+const traverse = traverseModule.default || traverseModule;
 
 function walkDir(dir, callback) {
   if (!fs.existsSync(dir)) return;
@@ -14,7 +18,7 @@ function walkDir(dir, callback) {
 }
 
 export default function pruneIcons() {
-  console.log(chalk.blue("🧹 Escaneando importaciones de iconos no utilizados..."));
+  console.log(chalk.blue("🧹 Escaneando importaciones de iconos (Análisis AST)..."));
 
   let prunedCount = 0;
   const srcDir = path.join(process.cwd(), 'src');
@@ -25,9 +29,33 @@ export default function pruneIcons() {
   }
 
   walkDir(srcDir, filePath => {
-    if (filePath.endsWith('.tsx') || filePath.endsWith('.ts')) {
+    if (filePath.endsWith('.tsx') || filePath.endsWith('.ts') || filePath.endsWith('.jsx') || filePath.endsWith('.js')) {
       let content = fs.readFileSync(filePath, 'utf8');
       
+      let ast;
+      try {
+        ast = parse(content, {
+          sourceType: 'module',
+          plugins: ['jsx', 'typescript']
+        });
+      } catch (e) {
+        // Skip files that fail to parse
+        return;
+      }
+
+      const usedIdentifiers = new Set();
+      
+      traverse(ast, {
+        Identifier(path) {
+          if (path.parent.type !== 'ImportSpecifier') {
+            usedIdentifiers.add(path.node.name);
+          }
+        },
+        JSXIdentifier(path) {
+          usedIdentifiers.add(path.node.name);
+        }
+      });
+
       const importRegex = /import\s+{([^}]+)}\s+from\s+["'](react-icons\/[a-z0-9]+|lucide-react)["'];/g;
       let newContent = content;
       let modifiedFile = false;
@@ -35,12 +63,9 @@ export default function pruneIcons() {
       newContent = newContent.replace(importRegex, (fullImport, iconListStr, pkg) => {
         const icons = iconListStr.split(',').map(i => i.trim()).filter(i => i.length > 0);
         const usedIcons = [];
-        
-        const contentWithoutImport = content.replace(fullImport, '');
 
         icons.forEach(icon => {
-          const usageRegex = new RegExp(`\\b${icon}\\b`);
-          if (usageRegex.test(contentWithoutImport)) {
+          if (usedIdentifiers.has(icon)) {
             usedIcons.push(icon);
           }
         });
@@ -68,7 +93,7 @@ export default function pruneIcons() {
   if (prunedCount === 0) {
     console.log(chalk.green("✨ ¡Todo limpio! No se encontraron importaciones de iconos sin usar."));
   } else {
-    console.log(chalk.green(`\n🎉 Limpieza completa. Se optimizaron las importaciones en ${prunedCount} archivos.`));
-    printHook(prunedCount * 120); // 120 tokens approx per file saved
+    console.log(chalk.green(`\n🎉 Limpieza completa (AST). Se optimizaron las importaciones en ${prunedCount} archivos.`));
+    printHook(prunedCount * 120);
   }
 }
