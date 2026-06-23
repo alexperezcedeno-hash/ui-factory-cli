@@ -1,6 +1,6 @@
 {
   "name": "@alexcodeui/ui-factory-cli",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "The Ultimate Next.js AI Agent Companion CLI - Save tokens, build faster.",
   "main": "bin/cli.js",
   "type": "module",

@@ -19,7 +19,7 @@ const program = new Command();
 program
   .name('uifactory')
   .description('The Ultimate Next.js AI Agent Companion CLI. AST Edition.')
-  .version('1.0.4');
+  .version('1.0.5');
 
 // Comandos por defecto de la terminal
 program.command('generate <name>').action(generate);

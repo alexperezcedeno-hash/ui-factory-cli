@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🤖 UI FACTORY CLI
+# 🤖 UI FACTORY CLI (AST EDITION)
 
 ![NPM Version](https://img.shields.io/npm/v/@alexcodeui/ui-factory-cli?style=for-the-badge&color=ff00ff)
 ![License](https://img.shields.io/npm/l/@alexcodeui/ui-factory-cli?style=for-the-badge&color=000000)
@@ -18,7 +18,9 @@
 Are you building Next.js applications using AI assistants (Claude, ChatGPT, Cursor)? 
 Stop wasting your context window and API tokens by making the AI manually scan for dead code, missing `"use client"` directives, or unused imports. 
 
-**UI Factory CLI** is a suite of hyper-fast local tools designed to do the "dirty work" locally in milliseconds, saving you massive amounts of tokens and preventing your AI from getting stuck in repetitive loops.
+**UI Factory CLI** is a suite of hyper-fast local tools designed to do the "dirty work" locally in milliseconds, saving you massive amounts of tokens and preventing your AI from getting stuck in repetitive loops. 
+
+🔥 **NEW IN v1.0.4+ (AST Edition):** The CLI now uses `@babel/parser` and `@babel/traverse` to read your code natively as an Abstract Syntax Tree. 100% precision, no regex false positives!
 
 ---
 
@@ -43,6 +45,8 @@ When you run the command, you will be greeted by our beautiful interactive menu 
   🔧 Inject 'use client' in Hooks (Fix Client)
   🔐 Sync Environment Variables (.env.example)
   🎨 Check Dark Mode Support (Theme Check)
+  🖼️  Optimize Images (next/image)
+  ⚖️  Split Check (Fat Components)
 ```
 
 ---
@@ -58,33 +62,45 @@ npx @alexcodeui/ui-factory-cli generate "Glitch Button"
 ```
 
 ### 2. `prune-icons`
-Did the AI leave unused `react-icons` imports in your file? This command safely scans and removes them.
+AST-based scan to safely remove unused `react-icons` or `lucide-react` imports.
 ```bash
 npx @alexcodeui/ui-factory-cli prune-icons
 ```
 
 ### 3. `dead-code`
-The Ghost Hunter. Scans your entire `src/` folder and lists components, hooks, or utils that you created but are no longer imported anywhere.
+The Ghost Hunter. AST parser resolves aliased imports (`@/components`) to find completely orphaned files in your `src/` folder.
 ```bash
 npx @alexcodeui/ui-factory-cli dead-code
 ```
 
 ### 4. `fix-client`
-The Next.js Savior. Scans your components and automatically injects `"use client";` if it detects the use of React hooks (`useState`, `useEffect`) or `framer-motion`.
+The Next.js Savior. Injects `"use client";` safely below existing directives if it detects React hooks or `framer-motion`.
 ```bash
 npx @alexcodeui/ui-factory-cli fix-client
 ```
 
 ### 5. `sync-env`
-Scans your code for `process.env.*` usage and automatically generates/updates a clean `.env.example` file so your team knows which keys are required.
+Scans your code for `process.env.*` usage and updates your `.env.example`.
 ```bash
 npx @alexcodeui/ui-factory-cli sync-env
 ```
 
 ### 6. `theme-check`
-Linter that checks the coverage of the `dark:` tailwind class in your components, ensuring your UI looks great at night.
+Checks the coverage of the `dark:` tailwind class in your components.
 ```bash
 npx @alexcodeui/ui-factory-cli theme-check
+```
+
+### 7. `optimize-images`
+Finds raw HTML `<img>` tags and suggests migrating to `<Image>` from `next/image` for better performance.
+```bash
+npx @alexcodeui/ui-factory-cli optimize-images
+```
+
+### 8. `split-check`
+Identifies "fat components" (>250 lines or >8 hooks) that consume too many AI context tokens and suggests splitting them.
+```bash
+npx @alexcodeui/ui-factory-cli split-check
 ```
 
 ---
@@ -95,3 +111,4 @@ npx @alexcodeui/ui-factory-cli theme-check
 *Coming soon: **The UI Factory** — Hyper-dynamic React components for the AI era.*
 
 </div>
+
